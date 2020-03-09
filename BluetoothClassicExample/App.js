@@ -1,41 +1,26 @@
 import React from 'react';
 import {
+  ActivityIndicator,
+  FlatList,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  View,
-  ScrollView,
-  FlatList,
   TouchableOpacity,
-  StatusBar,
-  KeyboardAvoidingView,
-  ActivityIndicator
-} from "react-native";
-import RNBluetoothClassic, {
-  BTEvents,
-  BTCharsets,
-} from 'react-native-bluetooth-classic';
-import {
-  Root,
-  Container,
-  Toast,
-  Header,
-  Title,
-  Button,
-  Right,
-  Left,
-  Icon,
-  Body,
-  StyleProvider,
-} from 'native-base';
+  View,
+} from 'react-native';
+import RNBluetoothClassic, { BTCharsets, BTEvents } from 'react-native-bluetooth-classic';
+import { Container, Header, Left, Right, Root, StyleProvider, Title, Toast } from 'native-base';
 import getTheme from './native-base-theme/components';
-import material from './native-base-theme/variables/material';
 import platform from './native-base-theme/variables/platform';
 
-const DeviceList = ({devices, onPress, style}) => {
-  console.log('DeviceList.render()');
-  console.log(devices);
+const GPS = require('gps');
+const gps = new GPS;
+
+const DeviceList = ({ devices, onPress, style }) => {
+  // console.log('DeviceList.render()');
+  // console.log(devices);
 
   return (
     <ScrollView
@@ -51,9 +36,9 @@ const DeviceList = ({devices, onPress, style}) => {
             style={[styles.button, style]}
             onPress={() => onPress(device)}>
             <View
-              style={[styles.connectionStatus, {backgroundColor: bgColor}]}
+              style={[styles.connectionStatus, { backgroundColor: bgColor }]}
             />
-            <View style={{flex: 1}}>
+            <View style={{ flex: 1 }}>
               <Text style={styles.deviceName}>{device.name}</Text>
               <Text>{device.address}</Text>
             </View>
@@ -74,6 +59,11 @@ class ConnectionScreen extends React.Component {
   }
 
   componentDidMount() {
+    gps.on('data', function(data) {
+      // console.log(data, gps.state);
+      console.log(gps.state.lat, gps.state.lon, gps.state.speed, gps.state.alt, gps.state.track);
+    });
+
     this.onRead = RNBluetoothClassic.addListener(
       BTEvents.READ,
       this.handleRead,
@@ -93,25 +83,27 @@ class ConnectionScreen extends React.Component {
     var available = 0;
 
     do {
-      console.log('Checking for available data');
+      // console.log('Checking for available data');
       available = await RNBluetoothClassic.available();
-      console.log(`There are ${available} bytes of data available`);
+      // console.log(`There are ${available} bytes of data available`);
 
       if (available > 0) {
-        console.log('Attempting to read the next message from the device');
+        // console.log('Attempting to read the next message from the device');
         const data = await RNBluetoothClassic.readFromDevice();
 
-        console.log(data);
-        this.handleRead({data});
+        // console.log(data);
+        this.handleRead({ data });
       }
     } while (available > 0);
   };
 
   handleRead = data => {
-    data.timestamp = new Date();
-    let scannedData = this.state.scannedData;
-    scannedData.unshift(data);
-    this.setState({scannedData});
+    gps.update(data.data);
+
+    // let scannedData = this.state.scannedData;
+    // scannedData.unshift(data);
+
+    // this.setState({ scannedData });
   };
 
   sendData = async () => {
@@ -124,12 +116,12 @@ class ConnectionScreen extends React.Component {
       data: this.state.text,
       type: 'sent',
     });
-    this.setState({text: '', scannedData});
+    this.setState({ text: '', scannedData });
   };
 
   render() {
-    console.log('DeviceConnection.render()');
-    console.log(this.state);
+    // console.log('DeviceConnection.render()');
+    // console.log(this.state);
 
     return (
       <Container>
@@ -139,41 +131,41 @@ class ConnectionScreen extends React.Component {
           </Left>
           <Right>
             <TouchableOpacity onPress={this.props.disconnect}>
-              <Text style={[styles.toolbarButton, {color: '#F00'}]}>X</Text>
+              <Text style={[styles.toolbarButton, { color: '#F00' }]}>X</Text>
             </TouchableOpacity>
           </Right>
         </Header>
-        <View style={{flex: 1}}>
+        <View style={{ flex: 1 }}>
           <FlatList
-            style={{flex: 1}}
-            contentContainerStyle={{justifyContent: 'flex-end'}}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ justifyContent: 'flex-end' }}
             inverted
             ref="scannedDataList"
             data={this.state.scannedData}
             keyExtractor={(item, index) => item.timestamp.toISOString()}
-            renderItem={({item}) => (
+            renderItem={({ item }) => (
               <View
                 id={item.timestamp.toISOString()}
-                style={{flexDirection: 'row', justifyContent: 'flex-start'}}>
+                style={{ flexDirection: 'row', justifyContent: 'flex-start' }}>
                 <Text>{item.timestamp.toLocaleDateString()}</Text>
                 <Text>{item.type === 'sent' ? ' < ' : ' > '}</Text>
-                <Text style={{flexShrink: 1}}>{item.data.trim()}</Text>
+                <Text style={{ flexShrink: 1 }}>{item.data.trim()}</Text>
               </View>
             )}
           />
-          <View style={[styles.horizontalContainer, {backgroundColor: '#ccc'}]}>
+          <View style={[styles.horizontalContainer, { backgroundColor: '#ccc' }]}>
             <TextInput
               style={styles.textInput}
               placeholder={'Send Data'}
               value={this.state.text}
-              onChangeText={text => this.setState({text})}
+              onChangeText={text => this.setState({ text })}
               autoCapitalize="none"
               autoCorrect={false}
               onSubmitEditing={() => this.sendData()}
               returnKeyType="send"
             />
             <TouchableOpacity
-              style={{justifyContent: 'center'}}
+              style={{ justifyContent: 'center' }}
               onPress={() => this.sendData()}>
               <Text>Send</Text>
             </TouchableOpacity>
@@ -277,15 +269,15 @@ export default class App extends React.Component {
       try {
         let connectedDevice = await RNBluetoothClassic.getConnectedDevice();
 
-        console.log('initializeDevices::connectedDevice');
-        console.log(connectedDevice);
+        // console.log('initializeDevices::connectedDevice');
+        // console.log(connectedDevice);
         newState.connectedDevice = connectedDevice;
       } catch (error) {
         try {
           let devices = await RNBluetoothClassic.list();
 
-          console.log('initializeDevices::list');
-          console.log(devices);
+          // console.log('initializeDevices::list');
+          // console.log(devices);
           newState.deviceList = devices;
         } catch (error) {
           console.error(error.message);
@@ -297,13 +289,13 @@ export default class App extends React.Component {
   }
 
   async connectToDevice(device) {
-    console.log(`Attempting connection to device ${device.id}`);
+    // console.log(`Attempting connection to device ${device.id}`);
     try {
       await RNBluetoothClassic.setEncoding(BTCharsets.ASCII);
       let connectedDevice = await RNBluetoothClassic.connect(device.id);
-      this.setState({connectedDevice});
+      this.setState({ connectedDevice });
     } catch (error) {
-      console.log(error.message);
+      // console.log(error.message);
       Toast.show({
         text: `Connection to ${device.name} unsuccessful`,
         duration: 3000,
@@ -313,11 +305,11 @@ export default class App extends React.Component {
 
   async disconnectFromDevice() {
     await RNBluetoothClassic.disconnect();
-    this.setState({connectedDevice: undefined});
+    this.setState({ connectedDevice: undefined });
   }
 
   async acceptConnections() {
-    console.log("App is accepting connections now...");
+    // console.log('App is accepting connections now...');
     this.setState({ isAccepting: true });
 
     try {
@@ -325,9 +317,9 @@ export default class App extends React.Component {
 
       if (connectedDevice) {
         this.setState({ connectedDevice, isAccepting: false });
-      }      
-    } catch(error) {
-      console.log(error);
+      }
+    } catch (error) {
+      // console.log(error);
       Toast.show({
         text: `Unable to accept client connection`,
         duration: 3000,
@@ -337,13 +329,13 @@ export default class App extends React.Component {
   }
 
   async cancelAcceptConnections() {
-    console.log("Attempting to cancel accepting...");
-    
+    // console.log('Attempting to cancel accepting...');
+
     try {
       await RNBluetoothClassic.cancelAccept();
       this.setState({ connectedDevice: undefined, isAccepting: false });
-    } catch(error) {
-      console.log(error);
+    } catch (error) {
+      // console.log(error);
       Toast.show({
         text: `Unable to cancel accept client connection`,
         duration: 3000,
@@ -357,16 +349,16 @@ export default class App extends React.Component {
   cancelAccept = () => this.cancelAcceptConnections();
 
   render() {
-    console.log('App.render()');
-    console.log(this.state);
+    // console.log('App.render()');
+    // console.log(this.state);
 
     let connectedColor = !this.state.bluetoothEnabled
       ? styles.toolbarButton.color
       : 'green';
 
-    let acceptFn = !this.state.isAccepting 
+    let acceptFn = !this.state.isAccepting
       ? () => this.accept()
-      : () => this.cancelAccept();      
+      : () => this.cancelAccept();
 
     return (
       <StyleProvider style={getTheme(platform)}>
@@ -385,7 +377,7 @@ export default class App extends React.Component {
                   <Title>Devices</Title>
                 </Left>
                 <Right>
-                  <Text style={{color: connectedColor}}>O</Text>
+                  <Text style={{ color: connectedColor }}>O</Text>
                 </Right>
               </Header>
               <DeviceList
@@ -396,16 +388,16 @@ export default class App extends React.Component {
                 style={styles.startAcceptButton}
                 onPress={acceptFn}
               >
-                <Text style={[{ color: "#fff" }]}>
+                <Text style={[{ color: '#fff' }]}>
                   {this.state.isAccepting
-                    ? "Waiting (cancel)..."
-                    : "Accept Connection"}
+                    ? 'Waiting (cancel)...'
+                    : 'Accept Connection'}
                 </Text>
                 <ActivityIndicator
-                  size={"small"}
+                  size={'small'}
                   animating={this.state.isAccepting}
                 />
-              </TouchableOpacity>              
+              </TouchableOpacity>
             </Container>
           )}
         </Root>
@@ -467,12 +459,12 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   startAcceptButton: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#333",
-    padding: 9
-  },  
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#333',
+    padding: 9,
+  },
   deviceName: {
     fontSize: 16,
   },
